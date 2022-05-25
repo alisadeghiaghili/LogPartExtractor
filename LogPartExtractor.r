@@ -1,16 +1,10 @@
-library(rebus)
-library(stringr)
-library(dplyr)
-library(tidyr)
-library(readr)
-library(shiny)
-library(shinyFiles)
-library(DT)
+source("loadLibs.R")
+source("loadFuncs.R")
 
-logsPath <- choose.dir(caption = "select the logs path")
+# logsPath <- selectLogsFolder()
 # resultPath <- choose.dir(caption = "select a folder for result")
 
-fileNames <- dir(logsPath)
+fileNames <- extractLogNames(logsPath)
 resultList <- list()
 for (listInd in 1:length(fileNames)) {
   text <- readLines(file.path(logsPath, fileNames[listInd])) %>% 
