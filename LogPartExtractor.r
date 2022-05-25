@@ -1,14 +1,12 @@
 source("loadLibs.R")
 source("loadFuncs.R")
 
-# logsPath <- selectLogsFolder()
-# resultPath <- choose.dir(caption = "select a folder for result")
+logsPath <- selectLogsFolder()
+logFileNames <- extractLogNames(logsPath)
 
-fileNames <- extractLogNames(logsPath)
 resultList <- list()
-for (listInd in 1:length(fileNames)) {
-  text <- readLines(file.path(logsPath, fileNames[listInd])) %>% 
-    tolower()
+for (listInd in 1:length(logFileNames)) {
+  text <- extractFileContent(logsPath, fileNames[listInd])
   
   reqDF <- data.frame("ReqStart" = as.numeric(NA), 
                       "ReqFinish" = as.numeric(NA)) %>% 
@@ -43,19 +41,31 @@ for (listInd in 1:length(fileNames)) {
     summarise(ReqFinish = max(ReqFinish),
               ReqFinishMine = max(ReqFinishMine)) %>% 
     mutate("ResourceLine" = as.character(NA),
-           "Resource" = "spot/orders",
+           "BaseURL" = as.character(NA),
+           "Version" = as.character(NA),
+           "Resource" = as.character(NA),
            "RequestType" = as.character(NA), 
            "UserNameLine" = as.character(NA), 
            "UserName" = as.character(NA),
            "FileName" = fileNames[listInd])
   
   for (dfRow in 1:nrow(reqDF)) {
-    ResourceLines <- grep(x = text[reqDF[dfRow, ]$ReqStartMine:reqDF[dfRow, ]$ReqFinishMine], pattern = 'spot/orders') + reqDF[dfRow, ]$ReqStartMine - 1
+    ResourceLines <- grep(x = text[reqDF[dfRow, ]$ReqStartMine:reqDF[dfRow, ]$ReqFinishMine], pattern = 'https://api\\.ime\\.co\\.ir.*') + reqDF[dfRow, ]$ReqStartMine - 1
     if(length(ResourceLines) > 0) {
       reqDF[dfRow, ]$ResourceLine <- ResourceLines %>% as.character() %>% str_c(collapse = ", ")
-      reqDF[dfRow, ]$RequestType <- str_extract_all(string = text[c(ResourceLines)], pattern = "post|get|delete") %>% 
+      
+      reqDF[dfRow, ]$RequestType <- str_extract_all(string = text[c(ResourceLines)], pattern = "post|get|delete|put|patch|head") %>% 
         unlist() %>% 
         str_c(collapse = ", ")
+      
+      reqDF[dfRow, ]$BaseURL <- str_extract_all(string = text[c(ResourceLines)], pattern = "https://api\\.ime\\.co\\.ir")
+      
+      reqDF[dfRow, ]$Version <- str_extract_all(string = text[c(ResourceLines)], pattern = "https://api\\.ime\\.co\\.ir/v[0-9]+") %>% 
+        str_remove("https://api\\.ime\\.co\\.ir/")
+      
+      reqDF[dfRow, ]$Resource <- str_extract_all(string = text[c(ResourceLines)], pattern = "https://api\\.ime\\.co\\.ir/v[0-9]+/.+/.+\\?") %>% 
+        str_remove("\\?") %>% 
+        str_remove("https://api\\.ime\\.co\\.ir/v\\d+/")
       
       UserNameLine <- grep(x = text[reqDF[dfRow, ]$ReqStartMine:reqDF[dfRow, ]$ReqFinishMine], pattern = '\\[\\"name\\"\\,\\"[a-zA-Z.]*\\"\\]') + reqDF[dfRow, ]$ReqStartMine - 1
       reqDF[dfRow, ]$UserNameLine <- UserNameLine %>% as.character() %>% str_c(collapse = ", ")
@@ -74,9 +84,9 @@ for (listInd in 1:length(fileNames)) {
     filter(!is.na(ResourceLine)) %>% 
     filter(ResourceLine != "")
   
-  resultList[[listInd]] <- reqDF
-  rm(text)
-  rm(reqDF)
+  # resultList[[listInd]] <- reqDF
+  # rm(text)
+  # rm(reqDF)
 }
 
 result <- bind_rows(resultList) %>% 
